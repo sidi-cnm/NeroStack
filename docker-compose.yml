@@ -1,0 +1,98 @@
+
+
+# Définition du réseau privé pour l'ensemble des conteneurs
+# Ce réseau n'est pas accessible de l'extérieur du serveur (isolation)
+networks:
+  mayan_connect_network:
+    driver: bridge # Type de réseau privé Docker
+
+# Services de l'application
+services:
+
+  # 1. Base de Données (PostgreSQL) - Nécessaire pour Mayan
+  db:
+    image: postgres:13-alpine
+    container_name: mayan_db
+    environment:
+      POSTGRES_DB: mayan_db
+      POSTGRES_USER: mayan
+      POSTGRES_PASSWORD: ${MAYAN_DB_PASSWORD:-mayan_default_password} # À définir dans un .env
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    networks:
+      - mayan_connect_network
+    restart: always
+
+  # 2. Mayan EDMS - Le Moteur Documentaire (Data)
+  mayan:
+    image: mayanedms/mayanedms:latest
+    container_name: mayan_edms
+    environment:
+      # Connexion à la base de données via le nom du service (db) sur le réseau privé
+      MAYAN_DATABASE_ENGINE: django.db.backends.postgresql
+      MAYAN_DATABASE_NAME: mayan_db
+      MAYAN_DATABASE_USER: mayan
+      MAYAN_DATABASE_PASSWORD: ${MAYAN_DB_PASSWORD:-mayan_default_password}
+      MAYAN_DATABASE_HOST: db # Nom du service, résolu par le réseau privé
+      MAYAN_DATABASE_PORT: 5432
+    # NOTE: Pour la production, l'accès à l'interface native de Mayan devrait être contrôlé
+    # Ici, on expose le port 8000 pour les tests et le SSO (Grand Bonus)
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/mayan:/var/lib/mayan
+    networks:
+      - mayan_connect_network
+    depends_on:
+      - db
+    restart: always
+
+  # 3. Votre Backend - Gestion de l'Authentification et Accès Temporaire (Auth)
+  # Ce service sera développé par le Membre 2
+  backend:
+    build:
+      context: ./backend # Le chemin vers votre code source backend (ex: Python/Node.js)
+    container_name: votre_backend
+    # Le port de l'API de votre Backend est exposé à l'hôte pour être utilisé par le Client
+    # Il est crucial que ce service soit le point de contrôle pour la Logique d'Accès Temporaire
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app # Montage du code pour le développement
+    networks:
+      - mayan_connect_network
+    depends_on:
+      - mayan # Dépend de Mayan pour potentiellement faire des requêtes en son nom
+    restart: always
+
+  # 4. Votre Client - Interface Utilisateur (Web/Mobile)
+  # Ce service sera développé par le Membre 3
+  client:
+    build:
+      context: ./client # Le chemin vers votre code source client (ex: React/Vue/Flutter)
+    container_name: votre_client
+    # Le seul service directement accessible par l'utilisateur final sur Internet (réseau public)
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./client:/app
+    networks:
+      - mayan_connect_network
+    depends_on:
+      - backend # Dépend du Backend pour l'authentification
+    restart: always
+
+  # 5. Service IA Locale - Moteur d'Analyse (Intelligence)
+  # Ce service sera mis en place par le Membre 4
+ 
+  # 5. Service IA Locale - Moteur d'Analyse (Intelligence)
+  ia_locale:
+    image: ollama/ollama:latest
+    container_name: service_ia_locale
+    # La ligne 'ports' DOIT ÊTRE SUPPRIMÉE pour garantir l'isolation.
+    # 
+    volumes:
+      - ./data/ollama:/root/.ollama
+    networks:
+      - mayan_connect_network # Reste connecté uniquement au réseau interne.
+    restart: always

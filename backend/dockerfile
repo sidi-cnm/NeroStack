@@ -1,0 +1,13 @@
+# /backend/Dockerfile
+# Image de base pour le backend (Python est un choix courant pour les API REST)
+FROM python:3.10-slim
+
+# Définition du répertoire de travail dans le conteneur
+WORKDIR /app
+
+# Expose le port par défaut que le service va écouter
+EXPOSE 8080
+
+# Commande par défaut (un sleep infini pour maintenir le conteneur en vie)
+# Le Membre 2 remplacera cette ligne par la commande de lancement de son API
+CMD ["sleep", "infinity"]

@@ -1,0 +1,18 @@
+# ------------------------------------
+# Fichiers de configuration sensibles et données générées
+# Ces fichiers ne doivent jamais être dans un dépôt public.
+
+# Le mot de passe de la base de données
+.env
+
+# Dossier des volumes Docker (contient les données réelles de la DB, Mayan, et IA)
+data/
+
+# Fichiers générés par les environnements locaux
+node_modules/
+venv/
+__pycache__/
+
+# Logs et autres artefacts de build
+*.log
+# ------------------------------------

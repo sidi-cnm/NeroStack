@@ -1,0 +1,13 @@
+# /client/Dockerfile
+# Image de base pour le client (Node.js est courant pour les frameworks Frontend comme React/Vue)
+FROM node:18-alpine
+
+# Définition du répertoire de travail
+WORKDIR /app
+
+# Expose le port par défaut que le service va écouter
+EXPOSE 3000
+
+# Commande par défaut (un sleep infini pour maintenir le conteneur en vie)
+# Le Membre 3 remplacera cette ligne par la commande de lancement de son application Frontend
+CMD ["sleep", "infinity"]
