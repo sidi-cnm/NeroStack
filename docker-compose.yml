@@ -70,12 +70,13 @@ services:
   client:
     build:
       context: ./client # Le chemin vers votre code source client (ex: React/Vue/Flutter)
-    container_name: votre_client
+    container_name:  votre_client
     # Le seul service directement accessible par l'utilisateur final sur Internet (réseau public)
     ports:
       - "3000:3000"
     volumes:
       - ./client:/app
+      - /app/.next
     networks:
       - mayan_connect_network
     depends_on:
@@ -90,7 +91,7 @@ services:
     image: ollama/ollama:latest
     container_name: service_ia_locale
     # La ligne 'ports' DOIT ÊTRE SUPPRIMÉE pour garantir l'isolation.
-    # 
+     
     volumes:
       - ./data/ollama:/root/.ollama
     networks:

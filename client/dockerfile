@@ -1,13 +1,37 @@
 # /client/Dockerfile
-# Image de base pour le client (Node.js est courant pour les frameworks Frontend comme React/Vue)
-FROM node:18-alpine
 
-# Définition du répertoire de travail
+# --- ÉTAPE 1: LA CONSTRUCTION (BUILDER) ---
+# Utilisation d'une image non-slim pour garantir toutes les bibliothèques pour 'next build'
+FROM node:20.10.0 AS builder
+
 WORKDIR /app
 
-# Expose le port par défaut que le service va écouter
-EXPOSE 3000
+# Copier package.json et package-lock.json pour installer les dépendances
+COPY package.json package-lock.json ./
+RUN npm install
 
-# Commande par défaut (un sleep infini pour maintenir le conteneur en vie)
-# Le Membre 3 remplacera cette ligne par la commande de lancement de son application Frontend
-CMD ["sleep", "infinity"]
+# Copier le reste du code source du client
+COPY . .
+
+# *** COMMANDE CRUCIALE : Génération du dossier de production .next ***
+RUN npm run build
+
+
+# --- ÉTAPE 2: LE RUNNER (PRODUCTION) ---
+# Utilisation d'une image légère pour l'exécution (contient moins de failles de sécurité)
+FROM node:20.10-slim AS runner
+
+WORKDIR /app
+
+# Copier le dossier de construction (.next) de l'étape 1
+COPY --from=builder /app/.next ./.next
+
+# Copier les fichiers critiques (public, node_modules et package.json pour next start)
+COPY --from=builder /app/node_modules ./node_modules
+COPY public ./public
+COPY package.json ./
+
+# Définir le mode production, le port et la commande d'exécution
+ENV NODE_ENV production
+EXPOSE 3000
+CMD ["npm", "start"]

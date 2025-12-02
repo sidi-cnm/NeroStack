@@ -1,0 +1,16 @@
+
+
+Phase 1 : Installation Initiale et Premier Démarrage (Tous les Membres)
+
+Cette phase est à exécuter une seule fois par chaque membre de l'équipe.
+
+Étape    Action           Commande               Principe
+Étape 1	Cloner le Dépôt	  git clone  	Récupération de l'architecture
+         
+Étape 2	Accéder au Dossier	cd Nerostack	Entrer dans le répertoire de travail
+
+Étape 3	Créer le .env	Créez manuellement le fichier .env et ajoutez le secret de la base de données : MAYAN_DB_PASSWORD=VotreMotDePasseSecret	Sécurité et Configuration
+
+Étape 4	Premier Lancement	docker-compose up -d --build	Construction des images et démarrage de l'infrastructure
+
+Étape 5	Vérification	docker-compose ps	Confirmer que les 5 services sont en statut Up (en cours d'exécution).
