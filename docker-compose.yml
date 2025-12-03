@@ -9,19 +9,27 @@ networks:
 # Services de l'application
 services:
 
-  # 1. Base de Données (PostgreSQL) - Nécessaire pour Mayan
+  # 1. Base de Données (PostgreSQL) - Partagée entre Mayan et Backend
   db:
     image: postgres:13-alpine
     container_name: mayan_db
     environment:
       POSTGRES_DB: mayan_db
       POSTGRES_USER: mayan
-      POSTGRES_PASSWORD: ${MAYAN_DB_PASSWORD:-mayan_default_password} # À définir dans un .env
+      POSTGRES_PASSWORD: ${MAYAN_DB_PASSWORD:-mayan_default_password}
+      # Base de données supplémentaire pour le backend
+      POSTGRES_MULTIPLE_DATABASES: nerostack_db
     volumes:
       - ./data/db:/var/lib/postgresql/data
+      - ./backend/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     networks:
       - mayan_connect_network
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mayan -d mayan_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # 2. Mayan EDMS - Le Moteur Documentaire (Data)
   mayan:
@@ -51,23 +59,44 @@ services:
       - redis
     restart: always
 
-  # 3. Votre Backend - Gestion de l'Authentification et Accès Temporaire (Auth)
-  # Ce service sera développé par le Membre 2
+  # 3. Backend Flask - Gestion de l'Authentification et Accès Temporaire (Auth)
   backend:
     build:
-      context: ./backend # Le chemin vers votre code source backend (ex: Python/Node.js)
-    container_name: votre_backend
-    # Le port de l'API de votre Backend est exposé à l'hôte pour être utilisé par le Client
-    # Il est crucial que ce service soit le point de contrôle pour la Logique d'Accès Temporaire
+      context: ./backend
+      dockerfile: dockerfile
+    container_name: nerostack_backend
+    environment:
+      FLASK_ENV: development
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-jwt-secret-key-change-in-production}
+      # Connexion à PostgreSQL (même conteneur que Mayan)
+      DATABASE_URL: postgresql://nerostack:nerostack_password@db:5432/nerostack_db
+      MAYAN_URL: http://mayan:8000
+      MAYAN_ADMIN_USER: ${MAYAN_ADMIN_USER:-admin}
+      MAYAN_ADMIN_PASSWORD: ${MAYAN_ADMIN_PASSWORD:-admin}
+      OLLAMA_URL: http://service_ia_locale:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      CORS_ORIGINS: http://localhost:3000,http://votre_client:3000
     ports:
       - "8080:8080"
     volumes:
-      - ./backend:/app # Montage du code pour le développement
+      - ./backend:/app
     networks:
       - mayan_connect_network
     depends_on:
-      - mayan # Dépend de Mayan pour potentiellement faire des requêtes en son nom
+      db:
+        condition: service_healthy
+      mayan:
+        condition: service_started
+      ia_locale:
+        condition: service_started
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # 4. Votre Client - Interface Utilisateur (Web/Mobile)
   # Ce service sera développé par le Membre 3

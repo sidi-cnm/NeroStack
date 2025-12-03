@@ -1,13 +1,32 @@
 # /backend/Dockerfile
-# Image de base pour le backend (Python est un choix courant pour les API REST)
+# Image de base Python pour le backend Flask
 FROM python:3.10-slim
 
-# Définition du répertoire de travail dans le conteneur
+# Définition du répertoire de travail
 WORKDIR /app
 
-# Expose le port par défaut que le service va écouter
+# Variables d'environnement
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    FLASK_ENV=development \
+    FLASK_APP=app.py
+
+
+
+# Copier et installer les dépendances Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copier le code source
+COPY . .
+
+# Exposer le port
 EXPOSE 8080
 
-# Commande par défaut (un sleep infini pour maintenir le conteneur en vie)
-# Le Membre 2 remplacera cette ligne par la commande de lancement de son API
-CMD ["sleep", "infinity"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import requests; requests.get('http://localhost:8080/api/health')" || exit 1
+
+# Commande de démarrage avec Gunicorn pour la production
+# En développement, on peut utiliser Flask directement
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "120", "app:app"]
