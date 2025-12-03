@@ -42,7 +42,7 @@ services:
       MAYAN_DATABASE_USER: mayan
       user: "1000:1000"
       MAYAN_DATABASE_PASSWORD: ${MAYAN_DB_PASSWORD:-mayan_default_password}
-      MAYAN_DATABASE_HOST: db 
+      MAYAN_DATABASE_HOST: db
       MAYAN_BROKER_URL: redis://redis:6379/0
       MAYAN_CACHE_BACKEND: django.core.cache.backends.locmem.LocMemCache
       MAYAN_DATABASE_PORT: 5432
@@ -118,23 +118,23 @@ services:
 
   # 5. Service IA Locale - Moteur d'Analyse (Intelligence)
   # Ce service sera mis en place par le Membre 4
- 
+
   # 5. Service IA Locale - Moteur d'Analyse (Intelligence)
   ia_locale:
     image: ollama/ollama:latest
     container_name: service_ia_locale
     # La ligne 'ports' DOIT ÊTRE SUPPRIMÉE pour garantir l'isolation.
-    # 
+    #
     volumes:
       - ./data/ollama:/root/.ollama
     networks:
       - mayan_connect_network # Reste connecté uniquement au réseau interne.
     restart: always
-  
-    
+
+
   redis:
     image: redis:6-alpine
     container_name: mayan_redis
     networks:
       - mayan_connect_network
-    restart: always  
+    restart: always

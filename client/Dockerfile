@@ -34,4 +34,5 @@ COPY package.json ./
 # Définir le mode production, le port et la commande d'exécution
 ENV NODE_ENV production
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["npx", "next", "start"]
+
