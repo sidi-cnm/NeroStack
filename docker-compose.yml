@@ -32,19 +32,23 @@ services:
       MAYAN_DATABASE_ENGINE: django.db.backends.postgresql
       MAYAN_DATABASE_NAME: mayan_db
       MAYAN_DATABASE_USER: mayan
+      user: "1000:1000"
       MAYAN_DATABASE_PASSWORD: ${MAYAN_DB_PASSWORD:-mayan_default_password}
-      MAYAN_DATABASE_HOST: db # Nom du service, résolu par le réseau privé
+      MAYAN_DATABASE_HOST: db 
+      MAYAN_BROKER_URL: redis://redis:6379/0
+      MAYAN_CACHE_BACKEND: django.core.cache.backends.locmem.LocMemCache
       MAYAN_DATABASE_PORT: 5432
     # NOTE: Pour la production, l'accès à l'interface native de Mayan devrait être contrôlé
     # Ici, on expose le port 8000 pour les tests et le SSO (Grand Bonus)
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - ./data/mayan:/var/lib/mayan
     networks:
       - mayan_connect_network
     depends_on:
       - db
+      - redis
     restart: always
 
   # 3. Votre Backend - Gestion de l'Authentification et Accès Temporaire (Auth)
@@ -91,9 +95,17 @@ services:
     image: ollama/ollama:latest
     container_name: service_ia_locale
     # La ligne 'ports' DOIT ÊTRE SUPPRIMÉE pour garantir l'isolation.
-     
+    # 
     volumes:
       - ./data/ollama:/root/.ollama
     networks:
       - mayan_connect_network # Reste connecté uniquement au réseau interne.
     restart: always
+  
+    
+  redis:
+    image: redis:6-alpine
+    container_name: mayan_redis
+    networks:
+      - mayan_connect_network
+    restart: always  
