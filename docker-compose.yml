@@ -125,13 +125,11 @@ services:
     image: ollama/ollama:latest
     container_name: service_ia_locale
     # La ligne 'ports' DOIT ÊTRE SUPPRIMÉE pour garantir l'isolation.
-    #
     volumes:
       - ./data/ollama:/root/.ollama
       - ./init.sh:/usr/local/bin/init.sh
-
-    entrypoint: ["/bin/ollama"]
-    command: ["serve"]
+      - ./ollama-entrypoint.sh:/usr/local/bin/ollama-entrypoint.sh
+    entrypoint: ["/bin/bash", "/usr/local/bin/ollama-entrypoint.sh"]
     networks:
       - mayan_connect_network # Reste connecté uniquement au réseau interne.
     restart: always

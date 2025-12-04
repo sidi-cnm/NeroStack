@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# Attendre quelques secondes pour s'assurer que le serveur Ollama est opérationnel (port 11434)
-echo "Attente du démarrage du service Ollama..."
-sleep 15  # Augmente le temps d'attente pour plus de fiabilité
+# Le serveur Ollama est déjà démarré et prêt (géré par l'entrypoint)
+# Pas besoin d'attendre ici car l'entrypoint s'en charge
 
 # Nom du modèle à vérifier et à télécharger
 MODEL_NAME="tinyllama:1.1b-chat-v0.6-q4_1"
