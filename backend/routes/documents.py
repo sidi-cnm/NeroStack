@@ -355,15 +355,6 @@ def upload_document():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
     
-    # Vérifier l'accès en écriture (admin ou accès write/admin)
-    if not user.is_admin():
-        accesses = TemporaryAccess.get_user_valid_accesses(user.id)
-        has_write = any(a.access_type in ['write', 'admin'] for a in accesses)
-        if not has_write:
-            return jsonify({
-                'error': 'Accès refusé',
-                'message': 'Vous n\'avez pas les droits d\'upload'
-            }), 403
     
     if 'file' not in request.files:
         return jsonify({'error': 'Fichier requis'}), 400
