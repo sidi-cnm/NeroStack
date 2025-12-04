@@ -16,11 +16,11 @@ class MayanService:
     Service pour interagir avec l'API Mayan EDMS.
     Documentation API Mayan: https://docs.mayan-edms.com/api.html
     """
-    
+
     def __init__(self, base_url: str = None, username: str = None, password: str = None):
         """
         Initialise le service Mayan.
-        
+
         Args:
             base_url: URL de base de Mayan (ex: http://mayan:8000)
             username: Nom d'utilisateur admin Mayan
@@ -31,7 +31,7 @@ class MayanService:
         self.password = password or current_app.config.get('MAYAN_ADMIN_PASSWORD', 'admin')
         self._token = None
         self.api_url = f"{self.base_url}/api/v4"
-    
+
     def _get_auth_headers(self) -> Dict[str, str]:
         """Retourne les headers d'authentification Basic"""
         credentials = base64.b64encode(
@@ -41,31 +41,31 @@ class MayanService:
             'Authorization': f'Basic {credentials}',
             'Content-Type': 'application/json'
         }
-    
+
     def _get_token_headers(self, token: str) -> Dict[str, str]:
         """Retourne les headers avec un token utilisateur"""
         return {
             'Authorization': f'Token {token}',
             'Content-Type': 'application/json'
         }
-    
-    def _request(self, method: str, endpoint: str, 
+
+    def _request(self, method: str, endpoint: str,
                  token: str = None, **kwargs) -> requests.Response:
         """
         Effectue une requête vers l'API Mayan.
-        
+
         Args:
             method: Méthode HTTP (GET, POST, PUT, DELETE)
             endpoint: Endpoint de l'API (ex: /documents/)
             token: Token utilisateur (optionnel, utilise auth admin sinon)
             **kwargs: Arguments supplémentaires pour requests
-        
+
         Returns:
             Response object
         """
         url = f"{self.api_url}{endpoint}"
         headers = self._get_token_headers(token) if token else self._get_auth_headers()
-        
+
         try:
             response = requests.request(
                 method=method,
@@ -78,17 +78,17 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur requête Mayan: {e}")
             raise
-    
+
     # =========== Authentification ===========
-    
+
     def authenticate_user(self, username: str, password: str) -> Optional[str]:
         """
         Authentifie un utilisateur et retourne son token Mayan.
-        
+
         Args:
             username: Nom d'utilisateur
             password: Mot de passe
-        
+
         Returns:
             Token d'authentification ou None si échec
         """
@@ -104,20 +104,20 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur authentification Mayan: {e}")
             return None
-    
-    def create_mayan_user(self, username: str, email: str, 
-                          password: str, first_name: str = '', 
+
+    def create_mayan_user(self, username: str, email: str,
+                          password: str, first_name: str = '',
                           last_name: str = '') -> Optional[Dict]:
         """
         Crée un utilisateur dans Mayan EDMS.
-        
+
         Args:
             username: Nom d'utilisateur
             email: Email
             password: Mot de passe
             first_name: Prénom
             last_name: Nom
-        
+
         Returns:
             Données de l'utilisateur créé ou None
         """
@@ -140,7 +140,7 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur création utilisateur Mayan: {e}")
             return None
-    
+
     def get_user_by_username(self, username: str) -> Optional[Dict]:
         """Récupère un utilisateur Mayan par son username"""
         try:
@@ -152,19 +152,19 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur récupération utilisateur Mayan: {e}")
             return None
-    
+
     # =========== Documents ===========
-    
-    def get_documents(self, token: str = None, page: int = 1, 
+
+    def get_documents(self, token: str = None, page: int = 1,
                       page_size: int = 20) -> Dict:
         """
         Liste tous les documents.
-        
+
         Args:
             token: Token utilisateur
             page: Numéro de page
             page_size: Taille de page
-        
+
         Returns:
             Liste paginée des documents
         """
@@ -180,15 +180,15 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur liste documents: {e}")
             return {'count': 0, 'results': []}
-    
+
     def get_document(self, document_id: int, token: str = None) -> Optional[Dict]:
         """
         Récupère les détails d'un document.
-        
+
         Args:
             document_id: ID du document
             token: Token utilisateur
-        
+
         Returns:
             Détails du document ou None
         """
@@ -200,15 +200,15 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur récupération document: {e}")
             return None
-    
+
     def get_document_content(self, document_id: int, token: str = None) -> Optional[str]:
         """
         Récupère le contenu texte d'un document (OCR).
-        
+
         Args:
             document_id: ID du document
             token: Token utilisateur
-        
+
         Returns:
             Contenu texte du document
         """
@@ -221,14 +221,14 @@ class MayanService:
             )
             if response.status_code != 200:
                 return None
-            
+
             versions = response.json().get('results', [])
             if not versions:
                 return None
-            
+
             latest_version = versions[0]
             version_id = latest_version.get('id')
-            
+
             # Récupérer les pages de la version
             response = self._request(
                 'GET',
@@ -237,10 +237,10 @@ class MayanService:
             )
             if response.status_code != 200:
                 return None
-            
+
             pages = response.json().get('results', [])
             content_parts = []
-            
+
             # Récupérer le contenu OCR de chaque page
             for page in pages:
                 page_id = page.get('id')
@@ -254,24 +254,24 @@ class MayanService:
                     content = ocr_data.get('content', '')
                     if content:
                         content_parts.append(content)
-            
+
             return '\n\n'.join(content_parts) if content_parts else None
-            
+
         except requests.RequestException as e:
             logger.error(f"Erreur récupération contenu document: {e}")
             return None
-    
-    def search_documents(self, query: str, token: str = None, 
+
+    def search_documents(self, query: str, token: str = None,
                          page: int = 1, page_size: int = 20) -> Dict:
         """
         Recherche dans les documents (OCR full-text).
-        
+
         Args:
             query: Termes de recherche
             token: Token utilisateur
             page: Numéro de page
             page_size: Taille de page
-        
+
         Returns:
             Résultats de recherche paginés
         """
@@ -287,10 +287,10 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur recherche documents: {e}")
             return {'count': 0, 'results': []}
-    
 
 
-    def upload_document(self, file_data: bytes, filename: str, 
+
+    def upload_document(self, file_data: bytes, filename: str,
                         document_type_id: int = 1, token: str = None) -> Optional[Dict]:
         """
         Upload un nouveau document dans Mayan.
@@ -334,7 +334,7 @@ class MayanService:
             logger.debug(f"Response upload fichier: {file_resp.status_code} - {file_resp.text}")
             print(file_resp)
             if file_resp.status_code in (200, 201, 202):
-                
+
                 return doc_resp.json()
 
             logger.error(f"Erreur upload fichier: {file_resp.status_code} - {file_resp.text}")
@@ -345,7 +345,7 @@ class MayanService:
             return None
 
     # =========== Cabinets ===========
-    
+
     def get_cabinets(self, token: str = None) -> List[Dict]:
         """Liste tous les cabinets/dossiers"""
         try:
@@ -356,7 +356,7 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur liste cabinets: {e}")
             return []
-    
+
     def get_cabinet_documents(self, cabinet_id: int, token: str = None) -> List[Dict]:
         """Liste les documents d'un cabinet"""
         try:
@@ -371,9 +371,9 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur liste documents cabinet: {e}")
             return []
-    
+
     # =========== Types de documents ===========
-    
+
     def get_document_types(self, token: str = None) -> List[Dict]:
         """Liste tous les types de documents"""
         try:
@@ -384,9 +384,9 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur liste types documents: {e}")
             return []
-    
+
     # =========== Tags ===========
-    
+
     def get_document_tags(self, document_id: int, token: str = None) -> List[Dict]:
         """Récupère les tags d'un document"""
         try:
@@ -401,9 +401,9 @@ class MayanService:
         except requests.RequestException as e:
             logger.error(f"Erreur récupération tags: {e}")
             return []
-    
+
     # =========== Utilitaires ===========
-    
+
     def check_connection(self) -> bool:
         """Vérifie la connexion à Mayan"""
         try:
@@ -414,7 +414,7 @@ class MayanService:
             return response.status_code in [200, 401]
         except requests.RequestException:
             return False
-    
+
     def get_api_info(self) -> Optional[Dict]:
         """Récupère les informations de l'API Mayan"""
         try:

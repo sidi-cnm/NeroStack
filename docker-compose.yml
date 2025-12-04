@@ -93,7 +93,7 @@ services:
         condition: service_started
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health').read()"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -130,7 +130,8 @@ services:
       - ./data/ollama:/root/.ollama
       - ./init.sh:/usr/local/bin/init.sh
 
-    command: sh -c "ollama serve & /usr/local/bin/init.sh && wait"  
+    entrypoint: ["/bin/ollama"]
+    command: ["serve"]
     networks:
       - mayan_connect_network # Reste connecté uniquement au réseau interne.
     restart: always
