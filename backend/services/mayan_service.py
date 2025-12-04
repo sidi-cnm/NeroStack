@@ -288,40 +288,62 @@ class MayanService:
             logger.error(f"Erreur recherche documents: {e}")
             return {'count': 0, 'results': []}
     
+
+
     def upload_document(self, file_data: bytes, filename: str, 
                         document_type_id: int = 1, token: str = None) -> Optional[Dict]:
         """
-        Upload un nouveau document.
-        
+        Upload un nouveau document dans Mayan.
+
         Args:
             file_data: Données binaires du fichier
             filename: Nom du fichier
             document_type_id: ID du type de document
-            token: Token utilisateur
-        
+            token: Token utilisateur (optionnel)
+
         Returns:
-            Détails du document créé ou None
+            Détails du fichier attaché ou None en cas d'erreur
         """
         try:
             headers = self._get_token_headers(token) if token else self._get_auth_headers()
-            # Supprimer Content-Type pour multipart
-            del headers['Content-Type']
-            
-            response = requests.post(
+
+            doc_resp = requests.post(
                 f"{self.api_url}/documents/",
-                headers=headers,
-                files={'file': (filename, file_data)},
-                data={'document_type_id': document_type_id},
-                timeout=60
+                headers={**headers, "Content-Type": "application/json"},
+                json={
+                    "label": filename,
+                    "description": filename,
+                    "document_type_id": document_type_id
+                }
             )
-            if response.status_code == 201:
-                return response.json()
-            logger.warning(f"Échec upload document: {response.text}")
+            logger.debug(f"Response création document: {doc_resp.status_code} - {doc_resp.text}")
+            if doc_resp.status_code != 201:
+                logger.error(f"Erreur création document: {doc_resp.text}")
+                return None
+
+            document_id = doc_resp.json()["id"]
+
+            headers.pop("Content-Type", None)
+
+            file_resp = requests.post(
+                f"{self.api_url}/documents/{document_id}/files/",
+                headers=headers,
+                files={"file_new": (filename, file_data)},
+                data={"action_name": "replace"}  # "default" ou "upload" selon la configuration
+            )
+            logger.debug(f"Response upload fichier: {file_resp.status_code} - {file_resp.text}")
+            print(file_resp)
+            if file_resp.status_code in (200, 201, 202):
+                
+                return doc_resp.json()
+
+            logger.error(f"Erreur upload fichier: {file_resp.status_code} - {file_resp.text}")
             return None
-        except requests.RequestException as e:
-            logger.error(f"Erreur upload document: {e}")
+
+        except Exception as e:
+            logger.exception(f"Erreur upload: {e}")
             return None
-    
+
     # =========== Cabinets ===========
     
     def get_cabinets(self, token: str = None) -> List[Dict]:
