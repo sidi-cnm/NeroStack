@@ -43,9 +43,9 @@ services:
       user: "1000:1000"
       MAYAN_DATABASE_PASSWORD: ${MAYAN_DB_PASSWORD:-mayan_default_password}
       MAYAN_DATABASE_HOST: db
-      MAYAN_BROKER_URL: redis://redis:6379/0
       MAYAN_CACHE_BACKEND: django.core.cache.backends.locmem.LocMemCache
       MAYAN_DATABASE_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
     # NOTE: Pour la production, l'accès à l'interface native de Mayan devrait être contrôlé
     # Ici, on expose le port 8000 pour les tests et le SSO (Grand Bonus)
