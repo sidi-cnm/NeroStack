@@ -1,0 +1,53 @@
+def upload_document(self, file_data: bytes, filename: str, 
+                        document_type_id: int = 1, token: str = None) -> Optional[Dict]:
+        """
+        Upload un nouveau document dans Mayan.
+
+        Args:
+            file_data: Données binaires du fichier
+            filename: Nom du fichier
+            document_type_id: ID du type de document
+            token: Token utilisateur (optionnel)
+
+        Returns:
+            Détails du fichier attaché ou None en cas d'erreur
+        """
+        try:
+            headers = self._get_token_headers(token) if token else self._get_auth_headers()
+
+            doc_resp = requests.post(
+                f"{self.api_url}/documents/",
+                headers={**headers, "Content-Type": "application/json"},
+                json={
+                    "label": filename,
+                    "description": filename,
+                    "document_type_id": document_type_id
+                }
+            )
+            logger.debug(f"Response création document: {doc_resp.status_code} - {doc_resp.text}")
+            if doc_resp.status_code != 201:
+                logger.error(f"Erreur création document: {doc_resp.text}")
+                return None
+
+            document_id = doc_resp.json()["id"]
+
+            headers.pop("Content-Type", None)
+
+            file_resp = requests.post(
+                f"{self.api_url}/documents/{document_id}/files/",
+                headers=headers,
+                files={"file_new": (filename, file_data)},
+                data={"action_name": "default"}  # "default" ou "upload" selon la configuration
+            )
+            logger.debug(f"Response upload fichier: {file_resp.status_code} - {file_resp.text}")
+            print(file_resp)
+            if file_resp.status_code in (200, 201, 202):
+                
+                return doc_resp.json()
+
+            logger.error(f"Erreur upload fichier: {file_resp.status_code} - {file_resp.text}")
+            return None
+
+        except Exception as e:
+            logger.exception(f"Erreur upload: {e}")
+            return None
