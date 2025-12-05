@@ -4,7 +4,7 @@
 # Pas besoin d'attendre ici car l'entrypoint s'en charge
 
 # Nom du modèle à vérifier et à télécharger
-MODEL_NAME="tinyllama:1.1b-chat-v0.6-q4_1"
+MODEL_NAME="llama3.2"
 
 # Vérifie si le modèle est déjà présent
 # La vérification est plus robuste en cherchant le nom du modèle exact

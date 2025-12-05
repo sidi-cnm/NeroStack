@@ -11,7 +11,7 @@ from models.document_analysis import DocumentAnalysis
 from services.mayan_service import MayanService
 from services.ai_service import AIService
 import logging
-
+import requests
 logger = logging.getLogger(__name__)
 
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
@@ -26,7 +26,7 @@ def check_document_access(user: User, document_id: int) -> bool:
 
 # =========== Routes ===========
 
-@ai_bp.route('/analyze/<int:document_id>', methods=['POST'])
+@ai_bp.route('/analyze/<int:document_id>', methods=['GET'])
 @jwt_required()
 def analyze_document(document_id):
     """
@@ -53,58 +53,46 @@ def analyze_document(document_id):
             'message': 'Vous n\'avez pas accès à ce document'
         }), 403
     
-    data = request.json or {}
-    language = data.get('language', 'fr')
-    force_refresh = data.get('force_refresh', False)
-    
-    # Vérifier le cache
-    if not force_refresh:
-        cached = DocumentAnalysis.get_cached_analysis(document_id)
-        if cached:
-            return jsonify({
-                'analysis': cached.to_dict(),
-                'cached': True
-            }), 200
     
     # Récupérer le contenu du document
     mayan = MayanService()
     content = mayan.get_document_content(document_id, token=user.mayan_token)
-    
     if not content:
         return jsonify({
             'error': 'Contenu non disponible',
             'message': 'Impossible de récupérer le contenu du document. OCR peut-être en cours.'
         }), 404
     
-    # Vérifier la connexion IA
-    ai = AIService()
-    if not ai.check_connection():
-        return jsonify({
-            'error': 'Service IA indisponible',
-            'message': 'Le service Ollama n\'est pas accessible'
-        }), 503
-    
-    # Créer l'entrée d'analyse
+        # Créer l'entrée d'analyse
     analysis = DocumentAnalysis.create_analysis(
         document_id=document_id,
         user_id=user.id,
-        model_used=ai.model,
-        language=language
+        model_used="tinyllama:1.1b-chat-v0.6-q4_1",
+        language="fr"
     )
-    
     # Lancer l'analyse
     try:
         analysis.status = 'processing'
         db.session.commit()
         
-        result = ai.analyze_document(content, language=language)
+        result = requests.post(
+            f"http://service_ia_locale:11434/api/generate",
+            json={
+                "model": "llama3.2",
+                "prompt": f"Analyse le document suivant et fournis un résumé : \n\n{content}",
+                "stream": False,
+                "language": "fr"
+            },
+            timeout=300
+        )
         
-        if result.get('success'):
+        print(result.text)
+        if result.status_code == 200:
             analysis.mark_completed(
-                summary=result.get('summary', ''),
-                keywords=result.get('keywords', []),
-                key_points=result.get('key_points', []),
-                processing_time=result.get('processing_time')
+                summary=result.json().get('response'),
+                processing_time=result.json().get('eval_duration'),
+                keywords='keywords',
+                key_points='key_points',
             )
             
             return jsonify({
@@ -112,10 +100,10 @@ def analyze_document(document_id):
                 'cached': False
             }), 200
         else:
-            analysis.mark_failed(result.get('error', 'Erreur inconnue'))
+            analysis.mark_failed('Erreur inconnue')
             return jsonify({
                 'error': 'Analyse échouée',
-                'message': result.get('error', 'Erreur lors de l\'analyse')
+                'message': 'Erreur lors de l\'analyse'
             }), 500
             
     except Exception as e:

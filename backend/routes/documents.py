@@ -270,6 +270,45 @@ def search_documents():
     }), 200
 
 
+@documents_bp.route('/<int:document_id>/download', methods=['GET'])
+@jwt_required()
+def download_document(document_id):
+    """
+    Télécharge le fichier d'un document.
+    
+    Returns:
+        200: Fichier binaire du document
+        403: Accès refusé
+        404: Document non trouvé
+    """
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    
+    # Vérifier l'accès
+    has_access, error = check_user_access(user, document_id)
+    if not has_access:
+        return error
+    
+    mayan = get_mayan_service(user)
+    token = user.mayan_token
+    
+    result = mayan.download_document(document_id, token=token)
+    
+    if not result:
+        return jsonify({'error': 'Document non trouvé ou téléchargement impossible'}), 404
+    
+    file_data, filename, content_type = result
+    
+    return Response(
+        file_data,
+        mimetype=content_type,
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Length': str(len(file_data))
+        }
+    )
+
+
 @documents_bp.route('/<int:document_id>/tags', methods=['GET'])
 @jwt_required()
 def get_document_tags(document_id):
