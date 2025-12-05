@@ -33,7 +33,7 @@ services:
 
   # 2. Mayan EDMS - Le Moteur Documentaire (Data)
   mayan:
-    image: mayanedms/mayanedms:latest
+    image: mayanedms/mayanedms:v4.0
     container_name: mayan_edms
     environment:
       # Connexion à la base de données via le nom du service (db) sur le réseau privé
@@ -53,6 +53,9 @@ services:
       - "8001:8000"
     volumes:
       - ./data/mayan:/var/lib/mayan
+    
+
+  
     networks:
       - mayan_connect_network
     depends_on:
