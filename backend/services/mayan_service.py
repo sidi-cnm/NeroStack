@@ -344,6 +344,80 @@ class MayanService:
             logger.exception(f"Erreur upload: {e}")
             return None
 
+    def download_document(self, document_id: int, token: str = None) -> Optional[tuple]:
+        """
+        Télécharge le fichier d'un document.
+        
+        Args:
+            document_id: ID du document
+            token: Token utilisateur
+        
+        Returns:
+            Tuple (file_data, filename, content_type) ou None
+        """
+        try:
+            # Récupérer les informations du document pour le nom
+            doc_response = self._request('GET', f'/documents/{document_id}/', token=token)
+            if doc_response.status_code != 200:
+                logger.error(f"Document {document_id} non trouvé")
+                return None
+            
+            document = doc_response.json()
+            label = document.get('label', f'document_{document_id}')
+            
+            # Récupérer la dernière version du document
+            response = self._request(
+                'GET',
+                f'/documents/{document_id}/versions/',
+                token=token
+            )
+            print(response)
+            if response.status_code != 200:
+                logger.error(f"Impossible de récupérer les versions du document {document_id}")
+                return None
+            
+            versions = response.json().get('results', [])
+            if not versions:
+                logger.error(f"Aucune version trouvée pour le document {document_id}")
+                return None
+            
+            latest_version = versions[0]
+            version_id = latest_version.get('id')
+            
+            # Récupérer le fichier de la version
+            headers = self._get_token_headers(token) if token else self._get_auth_headers()
+            # Supprimer Content-Type pour le téléchargement binaire
+            headers.pop('Content-Type', None)
+            
+            download_url = f"{self.api_url}/documents/{document_id}/versions/{version_id}/download/"
+            
+            file_response = requests.get(
+                download_url,
+                headers=headers,
+                timeout=60,
+                stream=True
+            )
+            print(file_response)
+            if file_response.status_code == 200:
+                content_type = file_response.headers.get('Content-Type', 'application/octet-stream')
+                # Essayer d'obtenir le nom de fichier depuis Content-Disposition
+                content_disposition = file_response.headers.get('Content-Disposition', '')
+                filename = label
+                if 'filename=' in content_disposition:
+                    import re
+                    match = re.search(r'filename="?([^";\n]+)"?', content_disposition)
+                    if match:
+                        filename = match.group(1)
+                
+                return (file_response.content, filename, content_type)
+            
+            logger.error(f"Erreur téléchargement: {file_response.status_code}")
+            return None
+            
+        except requests.RequestException as e:
+            logger.error(f"Erreur téléchargement document: {e}")
+            return None
+
     # =========== Cabinets ===========
 
     def get_cabinets(self, token: str = None) -> List[Dict]:

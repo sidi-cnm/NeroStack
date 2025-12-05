@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api, TemporaryAccess, User } from '@/app/lib/api';
+import { api, TemporaryAccess, User, Document } from '@/app/lib/api';
 import { AppLayout } from '@/app/components/layout/app-layout';
 import { Card } from '@/app/components/ui/card';
 import { Table } from '@/app/components/ui/table';
@@ -30,9 +30,18 @@ export default function AdminAccessPage() {
     end_date: '',
     access_type: 'read' as 'read' | 'write' | 'admin',
     reason: '',
+    is_global: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Document selection states
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [selectedDocuments, setSelectedDocuments] = useState<number[]>([]);
+  const [documentSearch, setDocumentSearch] = useState('');
+  const [documentPage, setDocumentPage] = useState(1);
+  const [documentTotalPages, setDocumentTotalPages] = useState(1);
+  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
 
   const fetchAccesses = async () => {
     setIsLoading(true);
@@ -65,10 +74,47 @@ export default function AdminAccessPage() {
     }
   };
 
+  const fetchDocuments = async (search?: string, pageNum: number = 1) => {
+    setIsLoadingDocuments(true);
+    try {
+      const res = await api.getDocuments({
+        page: pageNum,
+        per_page: 20,
+        search: search || undefined,
+      });
+      if (res.data) {
+        setDocuments(res.data.documents || []);
+        setDocumentTotalPages(res.data.pages || 1);
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  };
+
   useEffect(() => {
     fetchAccesses();
     fetchUsers();
   }, [page, filter]);
+
+  useEffect(() => {
+    if (isCreateModalOpen) {
+      fetchDocuments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCreateModalOpen]);
+
+  useEffect(() => {
+    if (isCreateModalOpen) {
+      const timeoutId = setTimeout(() => {
+        fetchDocuments(documentSearch, 1);
+        setDocumentPage(1);
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentSearch, isCreateModalOpen]);
 
   const handleCreate = async () => {
     setError('');
@@ -84,6 +130,12 @@ export default function AdminAccessPage() {
     }
     if (!formData.end_date) {
       setError('Veuillez sélectionner une date de fin');
+      return;
+    }
+
+    // Check if documents are selected or global access
+    if (!formData.is_global && selectedDocuments.length === 0) {
+      setError('Veuillez sélectionner au moins un document ou activer l\'accès global');
       return;
     }
 
@@ -119,16 +171,43 @@ export default function AdminAccessPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await api.createAccess({
-        user_id: parseInt(formData.user_id),
-        document_id: formData.document_id ? parseInt(formData.document_id) : null,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        access_type: formData.access_type,
-        reason: formData.reason || undefined,
-      });
-      if (res.error) {
-        setError(res.error);
+      const documentIds = formData.is_global ? [null] : selectedDocuments;
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Create access for each selected document (or one global access)
+      for (const docId of documentIds) {
+        try {
+          const res = await api.createAccess({
+            user_id: parseInt(formData.user_id),
+            document_id: docId,
+            start_date: startDate.toISOString(),
+            end_date: endDate.toISOString(),
+            access_type: formData.access_type,
+            reason: formData.reason || undefined,
+          });
+          if (res.error) {
+            errorCount++;
+            console.error(`Error creating access for document ${docId}:`, res.error);
+          } else {
+            successCount++;
+          }
+        } catch (err) {
+          errorCount++;
+          console.error(`Error creating access for document ${docId}:`, err);
+        }
+      }
+
+      if (errorCount > 0 && successCount === 0) {
+        setError(`Erreur lors de la création de tous les accès`);
+      } else if (errorCount > 0) {
+        setError(`${successCount} accès créés, ${errorCount} erreurs`);
+        // Still close modal and refresh on partial success
+        setTimeout(() => {
+          setIsCreateModalOpen(false);
+          resetForm();
+          fetchAccesses();
+        }, 2000);
       } else {
         setIsCreateModalOpen(false);
         resetForm();
@@ -169,7 +248,24 @@ export default function AdminAccessPage() {
       end_date: '',
       access_type: 'read',
       reason: '',
+      is_global: false,
     });
+    setSelectedDocuments([]);
+    setDocumentSearch('');
+    setDocumentPage(1);
+  };
+
+  const toggleDocumentSelection = (docId: number) => {
+    setSelectedDocuments((prev) =>
+      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+    );
+  };
+
+  const toggleGlobalAccess = () => {
+    setFormData({ ...formData, is_global: !formData.is_global });
+    if (!formData.is_global) {
+      setSelectedDocuments([]);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -323,7 +419,7 @@ export default function AdminAccessPage() {
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
           title="Créer un accès temporaire"
-          size="md"
+          size="lg"
         >
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -340,13 +436,119 @@ export default function AdminAccessPage() {
                 ...users.map((u) => ({ value: u.id.toString(), label: `${u.username} (${u.email})` })),
               ]}
             />
-            <Input
-              label="ID du document (optionnel)"
-              type="number"
-              placeholder="Laisser vide pour accès global"
-              value={formData.document_id}
-              onChange={(e) => setFormData({ ...formData, document_id: e.target.value })}
-            />
+            {/* Global Access Toggle */}
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+              <input
+                type="checkbox"
+                id="global-access"
+                checked={formData.is_global}
+                onChange={toggleGlobalAccess}
+                className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-teal-500 focus:ring-teal-500 focus:ring-2"
+              />
+              <label htmlFor="global-access" className="text-sm text-slate-300 cursor-pointer flex-1">
+                Accès global (tous les documents)
+              </label>
+            </div>
+
+            {/* Document Selection */}
+            {!formData.is_global && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-slate-300">
+                    Documents ({selectedDocuments.length} sélectionné{selectedDocuments.length > 1 ? 's' : ''})
+                  </label>
+                  {selectedDocuments.length > 0 && (
+                    <button
+                      onClick={() => setSelectedDocuments([])}
+                      className="text-xs text-red-400 hover:text-red-300"
+                    >
+                      Tout désélectionner
+                    </button>
+                  )}
+                </div>
+
+                {/* Document Search */}
+                <Input
+                  placeholder="Rechercher un document..."
+                  value={documentSearch}
+                  onChange={(e) => setDocumentSearch(e.target.value)}
+                />
+
+                {/* Documents List */}
+                <div className="max-h-64 overflow-y-auto border border-slate-700/50 rounded-lg bg-slate-900/50">
+                  {isLoadingDocuments ? (
+                    <div className="p-4 text-center text-slate-400">Chargement...</div>
+                  ) : documents.length === 0 ? (
+                    <div className="p-4 text-center text-slate-400">Aucun document trouvé</div>
+                  ) : (
+                    <div className="divide-y divide-slate-700/50">
+                      {documents.map((doc) => (
+                        <label
+                          key={doc.id}
+                          className="flex items-start gap-3 p-3 hover:bg-slate-800/50 cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedDocuments.includes(doc.id)}
+                            onChange={() => toggleDocumentSelection(doc.id)}
+                            className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-teal-500 focus:ring-teal-500 focus:ring-2"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{doc.label}</p>
+                            {doc.description && (
+                              <p className="text-xs text-slate-400 mt-1 line-clamp-2">{doc.description}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1">
+                              {doc.document_type && (
+                                <Badge variant="info" size="sm">
+                                  {doc.document_type.label}
+                                </Badge>
+                              )}
+                              <span className="text-xs text-slate-500">ID: {doc.id}</span>
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Document Pagination */}
+                {documentTotalPages > 1 && (
+                  <div className="flex items-center justify-between text-sm text-slate-400">
+                    <button
+                      onClick={() => {
+                        const newPage = documentPage - 1;
+                        if (newPage >= 1) {
+                          setDocumentPage(newPage);
+                          fetchDocuments(documentSearch, newPage);
+                        }
+                      }}
+                      disabled={documentPage === 1}
+                      className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Précédent
+                    </button>
+                    <span>
+                      Page {documentPage} / {documentTotalPages}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const newPage = documentPage + 1;
+                        if (newPage <= documentTotalPages) {
+                          setDocumentPage(newPage);
+                          fetchDocuments(documentSearch, newPage);
+                        }
+                      }}
+                      disabled={documentPage === documentTotalPages}
+                      className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="Date de début"
