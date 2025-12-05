@@ -124,7 +124,7 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -166,7 +166,7 @@ class ApiService {
   }
 
   // ============ Auth ============
-  
+
   async login(username: string, password: string): Promise<ApiResponse<LoginResponse>> {
     return this.request<LoginResponse>('/api/auth/login', {
       method: 'POST',
@@ -219,7 +219,7 @@ class ApiService {
     if (params?.role) searchParams.set('role', params.role);
     if (params?.active !== undefined) searchParams.set('active', params.active.toString());
     if (params?.search) searchParams.set('search', params.search);
-    
+
     const query = searchParams.toString();
     return this.request<UsersResponse>(`/api/users${query ? `?${query}` : ''}`);
   }
@@ -297,7 +297,7 @@ class ApiService {
     if (params?.document_id) searchParams.set('document_id', params.document_id.toString());
     if (params?.active !== undefined) searchParams.set('active', params.active.toString());
     if (params?.valid !== undefined) searchParams.set('valid', params.valid.toString());
-    
+
     const query = searchParams.toString();
     return this.request<AccessesResponse>(`/api/access${query ? `?${query}` : ''}`);
   }
@@ -386,7 +386,7 @@ class ApiService {
     if (params?.per_page) searchParams.set('per_page', params.per_page.toString());
     if (params?.search) searchParams.set('search', params.search);
     if (params?.document_type) searchParams.set('document_type', params.document_type.toString());
-    
+
     const query = searchParams.toString();
     return this.request<DocumentsResponse>(`/api/documents${query ? `?${query}` : ''}`);
   }
@@ -404,15 +404,22 @@ class ApiService {
   async analyzeDocument(documentId: number, options?: {
     language?: string;
     force_refresh?: boolean;
-  }): Promise<ApiResponse<{ analysis: DocumentAnalysis }>> {
-    return this.request<{ analysis: DocumentAnalysis }>(`/api/ai/analyze/${documentId}`, {
-      method: 'POST',
-      body: JSON.stringify(options || {}),
-    });
+  }): Promise<ApiResponse<{ analysis: DocumentAnalysis; cached?: boolean }>> {
+    const searchParams = new URLSearchParams();
+    if (options?.language) searchParams.set('language', options.language);
+    if (options?.force_refresh) searchParams.set('force_refresh', 'true');
+
+    const query = searchParams.toString();
+    return this.request<{ analysis: DocumentAnalysis; cached?: boolean }>(
+      `/api/ai/analyze/${documentId}${query ? `?${query}` : ''}`,
+      {
+        method: 'GET',
+      }
+    );
   }
 
   async getDocumentAnalysis(documentId: number): Promise<ApiResponse<{ analysis: DocumentAnalysis | null }>> {
-    return this.request<{ analysis: DocumentAnalysis | null }>(`/api/ai/analysis/${documentId}`);
+    return this.request<{ analysis: DocumentAnalysis | null }>(`/api/ai/analysis/document/${documentId}`);
   }
 
   async askQuestion(documentId: number, question: string): Promise<ApiResponse<{

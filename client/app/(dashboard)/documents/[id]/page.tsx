@@ -24,6 +24,37 @@ export default function DocumentDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  const pollAnalysisStatus = async () => {
+    // Poller toutes les 2 secondes jusqu'à ce que l'analyse soit terminée
+    const maxAttempts = 60; // 2 minutes max
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        console.error('Timeout waiting for analysis');
+        return;
+      }
+
+      attempts++;
+
+      try {
+        const res = await api.getDocumentAnalysis(documentId);
+        if (res.data?.analysis) {
+          setAnalysis(res.data.analysis);
+
+          // Continuer à poller si toujours en traitement
+          if (res.data.analysis.status === 'processing') {
+            setTimeout(poll, 2000);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling analysis status:', error);
+      }
+    };
+
+    setTimeout(poll, 2000);
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -42,8 +73,13 @@ export default function DocumentDetailPage() {
 
         // Fetch existing analysis
         const analysisRes = await api.getDocumentAnalysis(documentId);
-        if (analysisRes.data) {
+        if (analysisRes.data?.analysis) {
           setAnalysis(analysisRes.data.analysis);
+
+          // Si l'analyse est en cours, continuer à poller
+          if (analysisRes.data.analysis.status === 'processing') {
+            pollAnalysisStatus();
+          }
         }
       } catch (error) {
         console.error('Error fetching document:', error);
@@ -60,12 +96,27 @@ export default function DocumentDetailPage() {
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     try {
-      const res = await api.analyzeDocument(documentId);
+      // Forcer une nouvelle analyse (force_refresh: true)
+      const res = await api.analyzeDocument(documentId, {
+        language: 'fr',
+        force_refresh: true
+      });
+
       if (res.data) {
         setAnalysis(res.data.analysis);
+
+        // Si l'analyse est en cours, poller pour mettre à jour
+        if (res.data.analysis.status === 'processing') {
+          pollAnalysisStatus();
+        }
+      } else if (res.error) {
+        // Afficher l'erreur à l'utilisateur
+        console.error('Analysis error:', res.error);
+        alert(`Erreur: ${res.error}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analyzing document:', error);
+      alert(`Erreur lors de l'analyse: ${error.message || 'Erreur inconnue'}`);
     } finally {
       setIsAnalyzing(false);
     }
