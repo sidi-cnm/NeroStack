@@ -252,29 +252,19 @@ export default function DocumentDetailPage() {
                 </div>
               ) : (
                 <div className="prose prose-invert prose-sm max-w-none">
-                  <p className="text-slate-300 leading-relaxed">{analysis.summary}</p>
+                  {analysis.summary ? (
+                    <p className="text-slate-300 leading-relaxed">{analysis.summary}</p>
+                  ) : (
+                    <p className="text-slate-400">Résumé non disponible</p>
+                  )}
                 </div>
               )}
             </Card>
 
-            {/* AI Keywords */}
-            <Card>
-              <CardHeader title="🏷️ Mots-clés IA" />
-              {!analysis?.keywords?.length ? (
-                <p className="text-slate-400 text-sm">Aucun mot-clé disponible</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {analysis.keywords.map((keyword, index) => (
-                    <Badge key={index} variant="default" size="md">
-                      {keyword}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </Card>
+
 
             {/* Key Points */}
-            {analysis?.key_points && analysis.key_points.length > 0 && (
+            {analysis?.key_points && Array.isArray(analysis.key_points) && analysis.key_points.length > 0 && (
               <Card>
                 <CardHeader title="📌 Points clés" />
                 <ul className="space-y-2">
@@ -316,25 +306,7 @@ export default function DocumentDetailPage() {
               </dl>
             </Card>
 
-            {/* Actions */}
-            <Card>
-              <CardHeader title="Actions" />
-              <div className="space-y-3">
-                <Button variant="secondary" className="w-full" disabled={!accessInfo?.has_access}>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Télécharger
-                </Button>
-                <Button variant="ghost" className="w-full" disabled={!accessInfo?.has_access}>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  Prévisualiser
-                </Button>
-              </div>
-            </Card>
+
           </div>
         </div>
       </div>

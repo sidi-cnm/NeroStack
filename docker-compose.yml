@@ -47,15 +47,15 @@ services:
       MAYAN_DATABASE_PORT: 5432
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
-    # NOTE: Pour la production, l'accès à l'interface native de Mayan devrait être contrôlé
-    # Ici, on expose le port 8000 pour les tests et le SSO (Grand Bonus)
+
     ports:
       - "8001:8000"
     volumes:
       - ./data/mayan:/var/lib/mayan
-    
-
-  
+      - ./init_mayan.sh:/usr/local/bin/init_mayan_admin.sh
+      - ./mayan-entrypoint-wrapper.sh:/usr/local/bin/mayan-entrypoint-wrapper.sh
+    entrypoint: /bin/bash
+    command: -c "chmod +x /usr/local/bin/init_mayan_admin.sh /usr/local/bin/mayan-entrypoint-wrapper.sh && /usr/local/bin/mayan-entrypoint-wrapper.sh"
     networks:
       - mayan_connect_network
     depends_on:
@@ -76,8 +76,8 @@ services:
       # Connexion à PostgreSQL (même conteneur que Mayan)
       DATABASE_URL: postgresql://nerostack:nerostack_password@db:5432/nerostack_db
       MAYAN_URL: http://mayan:8000
-      MAYAN_ADMIN_USER: ${MAYAN_ADMIN_USER:-admin}
-      MAYAN_ADMIN_PASSWORD: ${MAYAN_ADMIN_PASSWORD:-admin}
+      MAYAN_ADMIN_USER: admin
+      MAYAN_ADMIN_PASSWORD: admin
       OLLAMA_URL: http://service_ia_locale:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
       CORS_ORIGINS: http://localhost:3000,http://votre_client:3000

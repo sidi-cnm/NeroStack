@@ -305,37 +305,48 @@ class MayanService:
             Détails du fichier attaché ou None en cas d'erreur
         """
         try:
+            # Utiliser le token utilisateur si disponible, sinon utiliser les identifiants admin
             headers = self._get_token_headers(token) if token else self._get_auth_headers()
 
+            # Créer le document
             doc_resp = requests.post(
                 f"{self.api_url}/documents/",
                 headers={**headers, "Content-Type": "application/json"},
                 json={
                     "label": filename,
-                    "description": filename,
+                    "description": filename or "",
                     "document_type_id": document_type_id
-                }
+                },
+                timeout=30
             )
             logger.debug(f"Response création document: {doc_resp.status_code} - {doc_resp.text}")
-            if doc_resp.status_code != 201:
-                logger.error(f"Erreur création document: {doc_resp.text}")
+            
+            if doc_resp.status_code not in (200, 201):
+                logger.error(f"Erreur création document: {doc_resp.status_code} - {doc_resp.text}")
                 return None
 
-            document_id = doc_resp.json()["id"]
+            document_data = doc_resp.json()
+            document_id = document_data.get("id")
+            
+            if not document_id:
+                logger.error(f"Document ID manquant dans la réponse: {doc_resp.text}")
+                return None
 
-            headers.pop("Content-Type", None)
+            # Préparer les headers pour l'upload de fichier (sans Content-Type pour multipart)
+            upload_headers = {k: v for k, v in headers.items() if k.lower() != 'content-type'}
 
+            # Uploader le fichier
             file_resp = requests.post(
                 f"{self.api_url}/documents/{document_id}/files/",
-                headers=headers,
+                headers=upload_headers,
                 files={"file_new": (filename, file_data)},
-                data={"action_name": "replace"}  # "default" ou "upload" selon la configuration
+                data={"action": 1},  # 1=Replace, 2=Append, 3=Keep
+                timeout=60
             )
             logger.debug(f"Response upload fichier: {file_resp.status_code} - {file_resp.text}")
-            print(file_resp)
+            
             if file_resp.status_code in (200, 201, 202):
-
-                return doc_resp.json()
+                return document_data
 
             logger.error(f"Erreur upload fichier: {file_resp.status_code} - {file_resp.text}")
             return None
